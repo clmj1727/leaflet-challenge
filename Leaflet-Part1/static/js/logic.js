@@ -4,42 +4,28 @@ var defaultMap = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 	attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 });
 
-//grayscale layer
-var grayscale = L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_toner_lite/{z}/{x}/{y}{r}.{ext}', {
-	minZoom: 0,
-	maxZoom: 20,
-	attribution: '&copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://www.stamen.com/" target="_blank">Stamen Design</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-	ext: 'png'
-});
-
 //terrain layer
-var terrain = L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.{ext}', {
-	minZoom: 0,
-	maxZoom: 18,
-	attribution: '&copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://www.stamen.com/" target="_blank">Stamen Design</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-	ext: 'png'
+var terrain = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+	maxZoom: 17,
+	attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
 });
 
 //make basemaps object
 let basemaps = {
-    GrayScale: grayscale,
     Terrain: terrain,
     Default: defaultMap
 };
 
 
 // make a map object
-var myMap = L.myMap("map",{
-    center: [36.7783,  119.4179],
-    zoom: 5,
-    layers: [grayscale, terrain, defaultMap]
+var myMap = L.map("map",{
+    center: [37.8, -96],
+    zoom: 4.5,
+    layers: [terrain, defaultMap]
 });
 
 //add default map to the map
 defaultMap.addTo(myMap);
-
-//add control layer
-L.control().layers(basemaps).addTo(myMap)
 
 //get the data for the tectonic plates and draw on the map
 //variable to hold tectonic plates layer
@@ -60,7 +46,7 @@ d3.json("https://raw.githubusercontent.com/fraxen/tectonicplates/refs/heads/mast
 });
 
 //add tectonic plates to the map
-tectonicplates.addTo(myMap);
+//tectonicplates.addTo(myMap);
 
 //variable to hold tectonic plates layer
 let earthquakes = new L.layerGroup();
@@ -103,9 +89,9 @@ d3.json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geoj
             return {
                 opacity: 1,
                 fillOpacity: 0.5,
-                fillColor: dataColor(feature.geometry.coorinates[2]), //use index 2 for depth
+                fillColor: dataColor(feature.geometry.coordinates[2]), //use index 2 for depth
                 color: "000000", //black outline
-                radius: radiusSize(feature.property.mag), //grabs magnitude
+                radius: radiusSize(feature.properties.mag), //grabs magnitude
                 weight: 0.5
             }
         }
@@ -119,12 +105,12 @@ d3.json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geoj
             style: dataStyle, //calls data style fx
             //add popups
             onEachFeature: function(feature, layer){
-                layer.blindPopup(`Magnitude: <b>${feature.properties.mag}</b><br>
+                layer.bindPopup(`Magnitude: <b>${feature.properties.mag}</b><br>
                                 Depth: <b>${feature.geometry.coordinates[2]}</b><br>
                                 Location: <b>${feature.properties.place}</b>`);
             }
-        }.addTo(earthquakes))
-    }
+        }).addTo(earthquakes);
+}
 );
 
 //add the earthquake layer to the map
@@ -136,38 +122,53 @@ let overlays = {
     "Earthquakes": earthquakes
 };
 
-//add the layer control
-L.control
-    .layers(basemaps, overlays)
-    .addTo(myMap);
+    // Add the layer control
+    L.control
+        .layers(basemaps, overlays)
+        .addTo(myMap);
 
-//add the legend
-let legend = L.control(
-   {
-    position: "bottomright"
-   });
+    // Inject CSS for legend styling
+    const legendStyles = `
+        .legend {
+            background: white;
+            padding: 10px;
+            line-height: 18px;
+            color: #333;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+            font-size: 14px;
+        }
 
-// add properties to legend
-legend.onAdd = function () {
-    //div for legend to appear
-    let div = L.DomUtil.create("div", "info legend");
+        .legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.7;
+            display: inline-block;
+        }
+    `;
 
-    // set up
-    let intervals = [-10, 10,30,50, 70, 90];
+    const styleElement = document.createElement("style");
+    styleElement.innerHTML = legendStyles;
+    document.head.appendChild(styleElement);
 
-    //set the colors for int"ervals
-    let colors = ["green", "#cafc04", "#fcad02", "#fc8404", "#fc4902", "red"];
+    // Create the legend control
+    let legend = L.control({ position: "bottomright" });
 
-    // loop thorugh intervals and colors, to generate label
-    for(var i = 0; i <intervals.length; i++)
-    {
-        //inner html that sets square for each interval and label
-        div.innerHTML += "<i style = `background: "
-            + colors[i]
-            + "<></i>"
-            + intervals[i]
-            + (intervals[i + 1] ? "km &ndash km;" + intervals[i + 1] + "km<br>" : "+");
-    }
+    legend.onAdd = function () {
+        let div = L.DomUtil.create("div", "info legend");
+        let intervals = [-10, 10, 30, 50, 70, 90];
+        let colors = ["green", "#cafc04", "#fcad02", "#fc8404", "#fc4902", "red"];
 
-    return div;
-};
+        for (var i = 0; i < intervals.length; i++) {
+            div.innerHTML +=
+                "<i style='background:" + colors[i] + "'></i> " +
+                intervals[i] +
+                (intervals[i + 1] ? "km &ndash; " + intervals[i + 1] + "km<br>" : "+");
+        }
+
+        return div;
+    };
+
+    legend.addTo(myMap);
